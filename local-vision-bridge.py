@@ -37,6 +37,10 @@ class Filter:
             default="2024-10-21",
             description="Azure OpenAI API version",
         )
+        azure_openai_max_completion_tokens: int = Field(
+            default=2048,
+            description="Max completion tokens for Azure OpenAI vision requests",
+        )
         azure_openai_api_key: str = Field(
             default="",
             description="Azure OpenAI API key; falls back to AZURE_OPENAI_API_KEY",
@@ -217,7 +221,7 @@ class Filter:
                     ],
                 }
             ],
-            "max_completion_tokens": 512,
+            "max_completion_tokens": self.valves.azure_openai_max_completion_tokens,
         }
 
         url = (
