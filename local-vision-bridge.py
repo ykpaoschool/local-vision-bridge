@@ -4,6 +4,7 @@ author: feliscat
 description: Scans chat for images, caches descriptions to avoid re-processing, and injects them as system output.
 """
 
+import os
 import requests
 import hashlib
 from pydantic import BaseModel, Field
@@ -11,13 +12,37 @@ from typing import Optional, List, Union
 
 class Filter:
     class Valves(BaseModel):
+        vision_backend: str = Field(
+            default="openai_compatible",
+            description="Backend type: openai_compatible or azure_openai",
+        )
         vision_server_url: str = Field(
             default="http://host.docker.internal:8081/v1/chat/completions",
-            description="URL of the local vision llm",
+            description="URL of the OpenAI-compatible vision endpoint",
         )
         vision_model: str = Field(
             default="qwen2.5-vl-7b",
-            description="Model name",
+            description="Model name for openai_compatible backends",
+        )
+        azure_openai_endpoint: str = Field(
+            default="",
+            description="Azure OpenAI endpoint, e.g. https://YOUR_RESOURCE.openai.azure.com",
+        )
+        azure_openai_deployment: str = Field(
+            default="",
+            description="Azure OpenAI deployment name, e.g. gpt-5-mini",
+        )
+        azure_openai_api_version: str = Field(
+            default="2024-10-21",
+            description="Azure OpenAI API version",
+        )
+        azure_openai_api_key: str = Field(
+            default="",
+            description="Azure OpenAI API key; falls back to AZURE_OPENAI_API_KEY",
+        )
+        azure_openai_auth_token: str = Field(
+            default="",
+            description="Microsoft Entra bearer token; falls back to AZURE_OPENAI_AUTH_TOKEN",
         )
         vision_prompt: str = Field(
             default='Write a straightforward caption for this image. Begin with the main subject and medium. Mention pivotal elements—people, objects, scenery—using confident, definite language. Focus on concrete details like color, shape, texture, and spatial relationships. Show how elements interact. Omit mood and speculative wording. If text is present, quote it exactly. Note any watermarks, signatures, or compression artifacts. Never mention what\'s absent, resolution, or unobservable details. Vary your sentence structure and keep the description concise, without starting with "This image is…" or similar phrasing.',
@@ -122,6 +147,11 @@ class Filter:
         return body
 
     def _get_description(self, base64_image: str) -> str:
+        if self.valves.vision_backend == "azure_openai":
+            return self._get_description_from_azure(base64_image)
+        return self._get_description_from_openai_compatible(base64_image)
+
+    def _get_description_from_openai_compatible(self, base64_image: str) -> str:
         payload = {
             "model": self.valves.vision_model,
             "messages": [
@@ -148,6 +178,59 @@ class Filter:
             response = requests.post(
                 self.valves.vision_server_url, json=payload, timeout=30
             )
+            response.raise_for_status()
+            return response.json()["choices"][0]["message"]["content"]
+        except Exception as e:
+            return f"(Error reading image: {str(e)})"
+
+    def _get_description_from_azure(self, base64_image: str) -> str:
+        endpoint = self.valves.azure_openai_endpoint.rstrip("/")
+        deployment = self.valves.azure_openai_deployment
+        api_version = self.valves.azure_openai_api_version
+        api_key = self.valves.azure_openai_api_key or os.getenv("AZURE_OPENAI_API_KEY", "")
+        auth_token = self.valves.azure_openai_auth_token or os.getenv(
+            "AZURE_OPENAI_AUTH_TOKEN", ""
+        )
+
+        if not endpoint or not deployment:
+            return "(Error reading image: Azure endpoint or deployment is not configured)"
+
+        if not api_key and not auth_token:
+            return "(Error reading image: Azure API key or auth token is not configured)"
+
+        payload = {
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": self.valves.vision_prompt,
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{base64_image}"
+                            },
+                        },
+                    ],
+                }
+            ],
+            "max_completion_tokens": 512,
+        }
+
+        url = (
+            f"{endpoint}/openai/deployments/{deployment}/chat/completions"
+            f"?api-version={api_version}"
+        )
+        headers = {"Content-Type": "application/json"}
+        if auth_token:
+            headers["Authorization"] = f"Bearer {auth_token}"
+        else:
+            headers["api-key"] = api_key
+
+        try:
+            response = requests.post(url, headers=headers, json=payload, timeout=30)
             response.raise_for_status()
             return response.json()["choices"][0]["message"]["content"]
         except Exception as e:

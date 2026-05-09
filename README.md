@@ -13,3 +13,18 @@ This allows you to use massive, high-intelligence text-only models (like large M
 * **Model Agnostic:** Works with any text-only model in OpenWebUI.
 * **Universal Compatibility:** Handles both modern OpenAI-format image uploads and legacy/Ollama formats.
 * **System Framing:** Injects descriptions as "System Tool Output" so the model knows *it* is seeing the image, rather than thinking the user typed the description.
+* **Azure OpenAI Ready:** Can call a GPT-5 deployment on Azure AI Foundry / Azure OpenAI for image understanding.
+
+## Azure AI Foundry / Azure OpenAI Setup
+
+To use a `gpt-5-mini` deployment hosted in Azure, set these valves in OpenWebUI:
+
+* `vision_backend`: `azure_openai`
+* `azure_openai_endpoint`: your Azure OpenAI endpoint, for example `https://YOUR_RESOURCE.openai.azure.com`
+* `azure_openai_deployment`: your deployment name, for example `gpt-5-mini`
+* `azure_openai_api_version`: API version, default is `2024-10-21`
+* `azure_openai_api_key`: your API key
+
+If you prefer Microsoft Entra auth instead of an API key, leave `azure_openai_api_key` empty and provide `azure_openai_auth_token` or the `AZURE_OPENAI_AUTH_TOKEN` environment variable.
+
+When `vision_backend` stays as `openai_compatible`, the function behaves like the original version and sends images to `vision_server_url`.
