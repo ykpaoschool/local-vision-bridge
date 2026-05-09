@@ -7,6 +7,7 @@ description: Scans chat for images, caches descriptions to avoid re-processing, 
 import os
 import requests
 import hashlib
+import json
 from pydantic import BaseModel, Field
 from typing import Optional, List, Union
 
@@ -179,7 +180,7 @@ class Filter:
                 self.valves.vision_server_url, json=payload, timeout=30
             )
             response.raise_for_status()
-            return response.json()["choices"][0]["message"]["content"]
+            return self._extract_text_from_response(response.json())
         except Exception as e:
             return f"(Error reading image: {str(e)})"
 
@@ -232,6 +233,56 @@ class Filter:
         try:
             response = requests.post(url, headers=headers, json=payload, timeout=30)
             response.raise_for_status()
-            return response.json()["choices"][0]["message"]["content"]
+            return self._extract_text_from_response(response.json())
         except Exception as e:
             return f"(Error reading image: {str(e)})"
+
+    def _extract_text_from_response(self, data: dict) -> str:
+        try:
+            choice = data["choices"][0]
+            message = choice.get("message", {})
+            content = message.get("content")
+
+            if isinstance(content, str) and content.strip():
+                return content.strip()
+
+            if isinstance(content, list):
+                text_parts = []
+                for item in content:
+                    if not isinstance(item, dict):
+                        continue
+                    if item.get("type") == "text" and item.get("text"):
+                        text_parts.append(item["text"])
+                    elif item.get("type") == "output_text" and item.get("text"):
+                        text_parts.append(item["text"])
+                if text_parts:
+                    return "\n".join(text_parts).strip()
+
+            refusal = message.get("refusal")
+            finish_reason = choice.get("finish_reason")
+
+            diagnostics = []
+            if refusal:
+                diagnostics.append(f"refusal={refusal}")
+            if finish_reason:
+                diagnostics.append(f"finish_reason={finish_reason}")
+
+            content_filter_results = choice.get("content_filter_results")
+            if content_filter_results:
+                diagnostics.append(
+                    "content_filter_results="
+                    + json.dumps(content_filter_results, ensure_ascii=True)
+                )
+
+            if self.valves.debug_mode:
+                print(
+                    "[Vision Bridge] Empty model response: "
+                    + json.dumps(data, ensure_ascii=True)
+                )
+
+            if diagnostics:
+                return "(Image description was empty: " + "; ".join(diagnostics) + ")"
+
+            return "(Image description was empty: no text returned by model)"
+        except Exception as e:
+            return f"(Error parsing model response: {str(e)})"
