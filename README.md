@@ -6,6 +6,11 @@ This OpenWebUI Function intercepts image uploads, sends them to a local Vision-L
 
 This allows you to use massive, high-intelligence text-only models (like large MOE) while still enjoying multi-modal capabilities via a smaller, faster dedicated vision model.
 
+## Repositories
+
+* Current repository: `https://github.com/ykpaoschool/local-vision-bridge`
+* Fork source: `https://github.com/feliscat/local-vision-bridge`
+
 ## Features
 
 * **Zero-Latency Caching:** Hashes images so you only pay the "GPU tax" once. Subsequent turns in the chat are instant.
@@ -14,6 +19,7 @@ This allows you to use massive, high-intelligence text-only models (like large M
 * **Universal Compatibility:** Handles both modern OpenAI-format image uploads and legacy/Ollama formats.
 * **System Framing:** Injects descriptions as "System Tool Output" so the model knows *it* is seeing the image, rather than thinking the user typed the description.
 * **Azure OpenAI Ready:** Can call a GPT-5 deployment on Azure AI Foundry / Azure OpenAI for image understanding.
+* **Balanced Default Prompt:** Transcribes text-centric images in Markdown, renders formulas as LaTeX, and uses neutral 5W descriptions for non-text-centric images.
 
 ## Azure AI Foundry / Azure OpenAI Setup
 

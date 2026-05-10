@@ -1,7 +1,13 @@
 """
 title: Local Vision Bridge
 author: feliscat
-description: Scans chat for images, caches descriptions to avoid re-processing, and injects them as system output.
+author_url: https://github.com/feliscat
+maintainer: Colin Chen
+maintainer_url: https://github.com/ykpaoschool
+repository_url: https://github.com/ykpaoschool/local-vision-bridge
+upstream_repository_url: https://github.com/feliscat/local-vision-bridge
+version: 0.2.0
+description: Scans chat for images, caches OCR/captions to avoid re-processing, and injects the results as system output.
 """
 
 import os
@@ -50,7 +56,40 @@ class Filter:
             description="Microsoft Entra bearer token; falls back to AZURE_OPENAI_AUTH_TOKEN",
         )
         vision_prompt: str = Field(
-            default='Write a straightforward caption for this image. Begin with the main subject and medium. Mention pivotal elements—people, objects, scenery—using confident, definite language. Focus on concrete details like color, shape, texture, and spatial relationships. Show how elements interact. Omit mood and speculative wording. If text is present, quote it exactly. Note any watermarks, signatures, or compression artifacts. Never mention what\'s absent, resolution, or unobservable details. Vary your sentence structure and keep the description concise, without starting with "This image is…" or similar phrasing.',
+            default=(
+                "Analyze this image and produce an output that follows these rules exactly.\n\n"
+                "1. Output language:\n"
+                "Use the language of the visible text in the image if there is a clear dominant language.\n"
+                "If there is little or no visible text, or no single dominant language, use the user's language.\n\n"
+                "2. Decide whether the image is primarily text-centric or non-text-centric:\n"
+                "A text-centric image is a document page, slide, poster, screenshot, form, table, chart with substantial labels, "
+                "book page, receipt, whiteboard, handwritten note, or any image where reading the text is the main task.\n"
+                "A non-text-centric image is a photo, illustration, painting, scene, object-focused image, person-focused image, "
+                "interface snapshot with little text, or any image where visual content is the main task.\n\n"
+                "3. If the image is text-centric:\n"
+                "Transcribe the visible text as completely and faithfully as possible.\n"
+                "Preserve document structure using Markdown.\n"
+                "Use headings, lists, tables, and paragraphs when they are visually justified.\n"
+                "Quote text exactly as it appears, preserving wording, capitalization, punctuation, and line order when important.\n"
+                "If mathematical expressions or formulas are present, write them in LaTeX.\n"
+                "Do not summarize when full transcription is feasible.\n"
+                "If some text is unreadable, mark it clearly as [illegible].\n"
+                "If non-text visual elements matter, briefly note them after the transcription.\n\n"
+                "4. If the image is non-text-centric:\n"
+                "Write a concise, neutral, factual description using the 5W method when applicable:\n"
+                "Who is present, What is happening, When is visible or inferable only from explicit evidence such as a timestamp, "
+                "Where is visible from the scene, and Why only if directly shown by explicit text or universally obvious function.\n"
+                "Focus on observable subjects, objects, actions, layout, colors, shapes, textures, and spatial relationships.\n"
+                "Use definite, objective language.\n"
+                "Do not speculate about mood, intent, identity, cause, or anything not directly visible.\n"
+                "If visible text exists, quote it exactly.\n"
+                "If a watermark, signature, timestamp, or compression artifact is visible, mention it briefly.\n\n"
+                "5. General rules:\n"
+                "Do not mention what is absent.\n"
+                "Do not mention image resolution or technical metadata unless it is itself visible in the image.\n"
+                "Do not begin with phrases like \"This image is\".\n"
+                "Be precise, concrete, and concise."
+            ),
             description="Prompt for Vision Model to generate caption",
         )
         debug_mode: bool = Field(
