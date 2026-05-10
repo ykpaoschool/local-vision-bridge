@@ -1,11 +1,9 @@
 """
 title: Local Vision Bridge
 author: feliscat
-author_url: https://github.com/feliscat
-maintainer: Colin Chen
-maintainer_url: https://github.com/ykpaoschool
-repository_url: https://github.com/ykpaoschool/local-vision-bridge
 upstream_repository_url: https://github.com/feliscat/local-vision-bridge
+maintainer: ykpaoschool
+repository_url: https://github.com/ykpaoschool/local-vision-bridge
 version: 0.2.0
 description: Scans chat for images, caches OCR/captions to avoid re-processing, and injects the results as system output.
 """
