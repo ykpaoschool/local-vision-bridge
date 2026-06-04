@@ -201,37 +201,74 @@ class Filter:
             return self._get_description_from_azure(base64_image)
         return self._get_description_from_openai_compatible(base64_image)
 
-    def _get_description_from_openai_compatible(self, base64_image: str) -> str:
-        payload = {
+    def _build_vision_user_content(self, base64_image: str) -> list:
+        return [
+            {
+                "type": "text",
+                "text": self.valves.vision_prompt,
+            },
+            {
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:image/jpeg;base64,{base64_image}"
+                },
+            },
+        ]
+
+    def _post_json(self, url: str, payload: dict, headers: Optional[dict] = None) -> dict:
+        effective_headers = headers or {}
+        response = requests.post(
+            url,
+            headers=effective_headers,
+            json=payload,
+            timeout=30,
+        )
+        response.raise_for_status()
+        return response.json()
+
+    def _build_openai_compatible_payload(self, base64_image: str) -> dict:
+        return {
             "model": self.valves.vision_model,
             "messages": [
                 {
                     "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": self.valves.vision_prompt,
-                        },
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/jpeg;base64,{base64_image}"
-                            },
-                        },
-                    ],
+                    "content": self._build_vision_user_content(base64_image),
                 }
             ],
             "max_tokens": 512,
             "temperature": 0.1,
         }
+
+    def _build_openai_compatible_headers(self) -> dict:
+        return {}
+
+    def _get_description_from_openai_compatible(self, base64_image: str) -> str:
+        payload = self._build_openai_compatible_payload(base64_image)
+        headers = self._build_openai_compatible_headers()
         try:
-            response = requests.post(
-                self.valves.vision_server_url, json=payload, timeout=30
-            )
-            response.raise_for_status()
-            return self._extract_text_from_response(response.json())
+            data = self._post_json(self.valves.vision_server_url, payload, headers)
+            return self._extract_text_from_response(data)
         except Exception as e:
             return f"(Error reading image: {str(e)})"
+
+    def _build_azure_payload(self, base64_image: str) -> dict:
+        return {
+            "messages": [
+                {
+                    "role": "user",
+                    "content": self._build_vision_user_content(base64_image),
+                }
+            ],
+            "max_completion_tokens": self.valves.azure_openai_max_completion_tokens,
+        }
+
+    def _build_azure_headers(self, api_key: str, auth_token: str) -> dict:
+        headers = {"Content-Type": "application/json"}
+        if auth_token:
+            headers["Authorization"] = f"Bearer {auth_token}"
+        else:
+            headers["api-key"] = api_key
+        return headers
 
     def _get_description_from_azure(self, base64_image: str) -> str:
         endpoint = self.valves.azure_openai_endpoint.rstrip("/")
@@ -248,41 +285,17 @@ class Filter:
         if not api_key and not auth_token:
             return "(Error reading image: Azure API key or auth token is not configured)"
 
-        payload = {
-            "messages": [
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": self.valves.vision_prompt,
-                        },
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/jpeg;base64,{base64_image}"
-                            },
-                        },
-                    ],
-                }
-            ],
-            "max_completion_tokens": self.valves.azure_openai_max_completion_tokens,
-        }
+        payload = self._build_azure_payload(base64_image)
 
         url = (
             f"{endpoint}/openai/deployments/{deployment}/chat/completions"
             f"?api-version={api_version}"
         )
-        headers = {"Content-Type": "application/json"}
-        if auth_token:
-            headers["Authorization"] = f"Bearer {auth_token}"
-        else:
-            headers["api-key"] = api_key
+        headers = self._build_azure_headers(api_key, auth_token)
 
         try:
-            response = requests.post(url, headers=headers, json=payload, timeout=30)
-            response.raise_for_status()
-            return self._extract_text_from_response(response.json())
+            data = self._post_json(url, payload, headers)
+            return self._extract_text_from_response(data)
         except Exception as e:
             return f"(Error reading image: {str(e)})"
 
