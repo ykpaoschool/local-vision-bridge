@@ -4,7 +4,7 @@ author: feliscat
 upstream_repository_url: https://github.com/feliscat/local-vision-bridge
 maintainer: ykpaoschool
 repository_url: https://github.com/ykpaoschool/local-vision-bridge
-version: 0.2.0
+version: 0.3.0
 description: Scans chat for images, caches OCR/captions to avoid re-processing, and injects the results as system output.
 """
 
@@ -29,6 +29,14 @@ class Filter:
         vision_model: str = Field(
             default="qwen2.5-vl-7b",
             description="Model name for openai_compatible backends",
+        )
+        openai_compatible_auth_type: str = Field(
+            default="none",
+            description="Authentication type for openai_compatible: none or Bearer",
+        )
+        openai_compatible_auth_key: str = Field(
+            default="",
+            description="Bearer token for openai_compatible when auth type is Bearer",
         )
         azure_openai_endpoint: str = Field(
             default="",
@@ -239,8 +247,28 @@ class Filter:
             "temperature": 0.1,
         }
 
+    def _normalize_openai_compatible_auth_type(self) -> str:
+        auth_type = self.valves.openai_compatible_auth_type.strip().lower()
+        if auth_type in ("", "none"):
+            return "none"
+        if auth_type == "bearer":
+            return "bearer"
+        raise ValueError(
+            "openai_compatible_auth_type must be one of: none, Bearer"
+        )
+
     def _build_openai_compatible_headers(self) -> dict:
-        return {}
+        auth_type = self._normalize_openai_compatible_auth_type()
+        if auth_type == "none":
+            return {}
+
+        auth_key = self.valves.openai_compatible_auth_key.strip()
+        if not auth_key:
+            raise ValueError(
+                "openai_compatible_auth_key is required when openai_compatible_auth_type is Bearer"
+            )
+
+        return {"Authorization": f"Bearer {auth_key}"}
 
     def _get_description_from_openai_compatible(self, base64_image: str) -> str:
         payload = self._build_openai_compatible_payload(base64_image)

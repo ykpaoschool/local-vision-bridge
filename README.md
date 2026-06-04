@@ -21,10 +21,28 @@ This allows you to use massive, high-intelligence text-only models (like large M
 1. In OpenWebUI, go to `Admin Panel` -> `Functions`.
 2. Create a new function and paste the contents of `local-vision-bridge.py`.
 3. Enable the function for the models or chats where you want image-to-text bridging.
-4. If you are using a local OpenAI-compatible vision endpoint, set `vision_backend` to `openai_compatible`, then configure `vision_server_url` and `vision_model`.
-5. If you are using Azure OpenAI, set `vision_backend` to `azure_openai` and fill in the Azure-specific valves listed below.
-6. Upload an image in chat. The function will send the image to the configured vision model, cache the result, and inject the OCR/caption output back into the conversation as system tool output.
-7. For text-only models, keep the function enabled. For native multimodal models, disable it unless you explicitly want the image converted into text before inference.
+4. If you are using an OpenAI-compatible vision endpoint, set `vision_backend` to `openai_compatible`, then configure `vision_server_url` and `vision_model`.
+5. For remote third-party OpenAI-compatible providers, optionally set `openai_compatible_auth_type` to `Bearer` and provide `openai_compatible_auth_key`.
+6. If you are using Azure OpenAI, set `vision_backend` to `azure_openai` and fill in the Azure-specific valves listed below.
+7. Upload an image in chat. The function will send the image to the configured vision model, cache the result, and inject the OCR/caption output back into the conversation as system tool output.
+8. For text-only models, keep the function enabled. For native multimodal models, disable it unless you explicitly want the image converted into text before inference.
+
+## OpenAI-Compatible Setup
+
+For local endpoints such as Ollama or `llama.cpp`, keep the defaults:
+
+* `vision_backend`: `openai_compatible`
+* `vision_server_url`: your local OpenAI-compatible chat completions endpoint
+* `vision_model`: your vision-capable model name
+* `openai_compatible_auth_type`: `none`
+
+For remote third-party providers that expose an OpenAI-compatible API and require bearer auth, set:
+
+* `vision_backend`: `openai_compatible`
+* `vision_server_url`: the provider's OpenAI-compatible chat completions endpoint
+* `vision_model`: the provider model name
+* `openai_compatible_auth_type`: `Bearer`
+* `openai_compatible_auth_key`: your bearer token
 
 ## Azure AI Foundry / Azure OpenAI Setup
 
@@ -38,4 +56,4 @@ To use a `gpt-5-mini` deployment hosted in Azure, set these valves in OpenWebUI:
 
 If you prefer Microsoft Entra auth instead of an API key, leave `azure_openai_api_key` empty and provide `azure_openai_auth_token` or the `AZURE_OPENAI_AUTH_TOKEN` environment variable.
 
-When `vision_backend` stays as `openai_compatible`, the function behaves like the original version and sends images to `vision_server_url`.
+When `vision_backend` stays as `openai_compatible`, the default behavior remains unchanged: the function sends images to `vision_server_url` without authentication unless you explicitly switch `openai_compatible_auth_type` to `Bearer`.
